@@ -94,6 +94,10 @@ try {
                     e.amount as total_amount
                 FROM expenses e
                 JOIN expense_balances eb ON e.id = eb.expense_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM exported_items ei 
+                    WHERE ei.item_type = "expense" AND ei.item_id = e.id
+                )
                 ORDER BY e.created_at DESC
             ');
             foreach ($summary as &$row) {
@@ -134,7 +138,11 @@ try {
                     from_user,
                     to_user,
                     SUM(amount) as total_amount
-                FROM expense_balances
+                FROM expense_balances eb
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM exported_items ei 
+                    WHERE ei.item_type = "balance" AND ei.item_id = eb.id
+                )
                 GROUP BY from_user, to_user
             '));
 
@@ -151,7 +159,7 @@ try {
                 FROM rides r
                 LEFT JOIN ride_expense_link rel ON r.id = rel.ride_id
                 LEFT JOIN expenses e ON rel.expense_id = e.id
-                WHERE r.id NOT IN (SELECT ride_id FROM exported_items)
+                WHERE r.id NOT IN (SELECT item_id FROM exported_items WHERE item_type = "ride")
                 ORDER BY r.date DESC
             '));
 
