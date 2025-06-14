@@ -134,16 +134,38 @@ try {
 
         case 'GET total-balances':
             respond($db->queryAll('
-                SELECT 
-                    from_user,
-                    to_user,
-                    SUM(amount) as total_amount
-                FROM expense_balances eb
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM exported_items ei 
-                    WHERE ei.item_type = "balance" AND ei.item_id = eb.id
+                WITH net_balances AS (
+                    SELECT 
+                        from_user,
+                        to_user,
+                        SUM(amount) as amount
+                    FROM expense_balances eb
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM exported_items ei 
+                        WHERE ei.item_type = "balance" AND ei.item_id = eb.id
+                    )
+                    GROUP BY from_user, to_user
                 )
-                GROUP BY from_user, to_user
+                SELECT 
+                    CASE 
+                        WHEN net_amount > 0 THEN "Anne"
+                        ELSE "Bram"
+                    END as from_user,
+                    CASE 
+                        WHEN net_amount > 0 THEN "Bram"
+                        ELSE "Anne"
+                    END as to_user,
+                    ABS(net_amount) as total_amount
+                FROM (
+                    SELECT 
+                        SUM(CASE 
+                            WHEN from_user = "Anne" AND to_user = "Bram" THEN amount
+                            WHEN from_user = "Bram" AND to_user = "Anne" THEN -amount
+                            ELSE 0
+                        END) as net_amount
+                    FROM net_balances
+                ) as combined
+                WHERE net_amount != 0
             '));
 
         case 'GET rides/unexported':

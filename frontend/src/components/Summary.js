@@ -12,6 +12,8 @@ import {
   Alert,
 } from '@mui/material';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 // Generate a pastel color based on an ID
 const generateColor = (id) => {
   const hue = (id * 137.5) % 360; // Golden angle approximation
@@ -31,7 +33,7 @@ function Summary() {
         setError(null);
         
         // Fetch unexported rides
-        const ridesResponse = await fetch('http://localhost:3001/api/rides/unexported');
+        const ridesResponse = await fetch(`${API_URL}/api/rides/unexported`);
         if (!ridesResponse.ok) {
           const errorData = await ridesResponse.json();
           throw new Error(errorData.error || 'Failed to fetch unexported rides');
@@ -41,7 +43,7 @@ function Summary() {
         setUnexportedRides(ridesData);
 
         // Fetch expense balances
-        const summaryResponse = await fetch('http://localhost:3001/api/summary');
+        const summaryResponse = await fetch(`${API_URL}/api/summary`);
         if (!summaryResponse.ok) {
           const errorData = await summaryResponse.json();
           throw new Error(errorData.error || 'Failed to fetch summary data');
@@ -51,7 +53,7 @@ function Summary() {
         setDetailedBalances(summaryData);
 
         // Fetch total balances
-        const totalResponse = await fetch('http://localhost:3001/api/total-balances');
+        const totalResponse = await fetch(`${API_URL}/api/total-balances`);
         if (!totalResponse.ok) {
           const errorData = await totalResponse.json();
           throw new Error(errorData.error || 'Failed to fetch total balances');
@@ -161,7 +163,7 @@ function Summary() {
                   <TableRow key={`${balance.from_user}-${balance.to_user}`}>
                     <TableCell>{balance.from_user}</TableCell>
                     <TableCell>{balance.to_user}</TableCell>
-                    <TableCell align="right">€{balance.total_amount}</TableCell>
+                    <TableCell align="right">€{parseFloat(balance.total_amount).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
