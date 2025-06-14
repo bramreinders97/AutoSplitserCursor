@@ -27,14 +27,22 @@ function ExpenseForm({ rides, onSuccess }) {
   useEffect(() => {
     const fetchLinkedRides = async () => {
       try {
-        // Get unexported rides
-        const response = await fetch('http://localhost:3001/api/rides/unexported');
-        if (!response.ok) {
-          throw new Error('Failed to fetch available rides');
-        }
-        const availableRides = await response.json();
-        console.log('Available rides:', availableRides);
-        setAvailableRides(availableRides);
+        // Get all rides
+        const response = await fetch('http://localhost:3001/api/rides');
+        const allRides = await response.json();
+        
+        // Get all rides that are linked to expenses
+        const linkedRidesResponse = await fetch('http://localhost:3001/api/rides/linked');
+        const linkedRides = await linkedRidesResponse.json();
+        
+        // Create a set of ride IDs that are linked to expenses
+        const linkedRideIds = new Set(linkedRides.map(ride => ride.id));
+        
+        // Filter out rides that are already linked
+        const available = allRides.filter(ride => !linkedRideIds.has(ride.id));
+        console.log('Available rides:', available);
+        console.log('Linked rides:', linkedRides);
+        setAvailableRides(available);
       } catch (error) {
         console.error('Error fetching available rides:', error);
         setError('Failed to fetch available rides');

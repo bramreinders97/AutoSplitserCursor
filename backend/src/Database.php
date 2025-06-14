@@ -52,6 +52,15 @@ class Database {
         }
     }
 
+    public function queryAll($sql, $params = []) {
+        $result = $this->query($sql, $params);
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
     public function beginTransaction() {
         $this->connection->begin_transaction();
     }

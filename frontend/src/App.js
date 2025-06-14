@@ -14,6 +14,8 @@ import RideForm from './components/RideForm';
 import ExpenseForm from './components/ExpenseForm';
 import Summary from './components/Summary';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 function TabPanel({ children, value, index }) {
   return (
     <div hidden={value !== index}>
@@ -33,9 +35,9 @@ function App() {
     try {
       setError('');
       const [ridesRes, expensesRes, summaryRes] = await Promise.all([
-        fetch('http://localhost:3001/api/rides'),
-        fetch('http://localhost:3001/api/expenses'),
-        fetch('http://localhost:3001/api/summary')
+        fetch(`${API_URL}/api/rides`),
+        fetch(`${API_URL}/api/expenses`),
+        fetch(`${API_URL}/api/summary`)
       ]);
 
       if (!ridesRes.ok || !expensesRes.ok || !summaryRes.ok) {

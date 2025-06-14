@@ -11,6 +11,8 @@ import {
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 function RideForm({ onSuccess }) {
   const [driver, setDriver] = useState('');
   const [distance, setDistance] = useState('');
@@ -24,7 +26,7 @@ function RideForm({ onSuccess }) {
     setSuccess(false);
 
     try {
-      const response = await fetch('http://localhost:3001/api/rides', {
+      const response = await fetch(`${API_URL}/api/rides`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
