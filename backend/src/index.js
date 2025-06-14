@@ -21,6 +21,34 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+// Test database connection with retry
+const testConnection = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const connection = await pool.getConnection();
+      console.log('Database connection successful');
+      connection.release();
+      return true;
+    } catch (error) {
+      console.error(`Database connection attempt ${i + 1} failed:`, error.message);
+      if (i < retries - 1) {
+        console.log(`Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  console.error('Failed to connect to database after multiple attempts');
+  process.exit(1);
+};
+
+// Test connection on startup
+testConnection().then(() => {
+  // Start the server only after successful database connection
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+});
+
 // Test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
@@ -33,7 +61,7 @@ app.get('/api/rides', async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('Error fetching rides:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Error fetching rides' });
   }
 });
 
@@ -215,19 +243,28 @@ app.get('/api/summary', async (req, res) => {
     console.log('Fetching summary data...');
     const [rows] = await pool.query(`
       SELECT 
-        r.driver,
-        COALESCE(SUM(r.distance), 0) as total_distance,
-        COALESCE(SUM(e.amount * rel.percentage / 100), 0) as total_expense
-      FROM rides r
-      LEFT JOIN ride_expense_link rel ON r.id = rel.ride_id
-      LEFT JOIN expenses e ON rel.expense_id = e.id
-      GROUP BY r.driver
+        e.id as expense_id,
+        e.description as expense_description,
+        eb.from_user,
+        eb.to_user,
+        eb.amount,
+        e.amount as total_amount
+      FROM expenses e
+      JOIN expense_balances eb ON e.id = eb.expense_id
+      ORDER BY e.created_at DESC
     `);
-    console.log('Summary data:', rows);
-    res.json(rows);
+
+    const processedBalances = rows.map(row => ({
+      ...row,
+      amount: parseFloat(row.amount).toFixed(2),
+      total_amount: parseFloat(row.total_amount).toFixed(2)
+    }));
+
+    console.log('Processed expense balances:', processedBalances);
+    res.json(processedBalances);
   } catch (error) {
     console.error('Error fetching summary:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to fetch summary data' });
   }
 });
 
@@ -276,47 +313,49 @@ app.get('/api/expense-balances', async (req, res) => {
 // Get total balances
 app.get('/api/total-balances', async (req, res) => {
   try {
-    const query = `
-      WITH all_users AS (
-        SELECT 'Anne' as user UNION SELECT 'Bram'
-      ),
-      user_balances AS (
-        SELECT 
-          au.user,
-          CAST(COALESCE(SUM(eb.amount), 0) AS DECIMAL(10,2)) as balance
-        FROM all_users au
-        LEFT JOIN expense_balances eb ON au.user = eb.from_user
-        LEFT JOIN ride_expense_link rel ON eb.expense_id = rel.expense_id
-        LEFT JOIN rides r ON rel.ride_id = r.id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM exported_items ei 
-          WHERE ei.item_type = 'ride' AND ei.item_id = r.id
-        )
-        GROUP BY au.user
-      )
+    console.log('Fetching total balances...');
+    const [balances] = await pool.query(`
       SELECT 
-        CASE 
-          WHEN b1.balance > b2.balance THEN b1.user
-          ELSE b2.user
-        END as from_user,
-        CASE 
-          WHEN b1.balance > b2.balance THEN b2.user
-          ELSE b1.user
-        END as to_user,
-        CAST(ABS(b1.balance - b2.balance) AS DECIMAL(10,2)) as amount
-      FROM user_balances b1
-      JOIN user_balances b2 ON b1.user != b2.user
-      WHERE b1.user < b2.user
-      AND ABS(b1.balance - b2.balance) > 0
-    `;
-    const [rows] = await pool.query(query);
-    res.json(rows);
+        from_user,
+        to_user,
+        SUM(amount) as total_amount
+      FROM expense_balances
+      GROUP BY from_user, to_user
+    `);
+    console.log('Found total balances:', balances);
+    res.json(balances);
   } catch (error) {
     console.error('Error fetching total balances:', error);
-    res.status(500).json({ error: 'Error fetching total balances' });
+    res.status(500).json({ error: 'Failed to fetch total balances' });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Get all rides
+app.get('/api/rides', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM rides ORDER BY date DESC');
+    console.log('All rides:', rows);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching rides:', error);
+    res.status(500).json({ error: 'Error fetching rides' });
+  }
+});
+
+app.get('/api/rides/unexported', async (req, res) => {
+  try {
+    console.log('Fetching unexported rides...');
+    const [rides] = await pool.query(`
+      SELECT r.* 
+      FROM rides r
+      LEFT JOIN exported_items ei ON r.id = ei.item_id AND ei.item_type = 'ride'
+      WHERE ei.id IS NULL
+      ORDER BY r.date DESC
+    `);
+    console.log('Found unexported rides:', rides);
+    res.json(rides);
+  } catch (error) {
+    console.error('Error fetching unexported rides:', error);
+    res.status(500).json({ error: 'Failed to fetch unexported rides' });
+  }
 }); 

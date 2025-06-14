@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS car_expense_db;
-USE car_expense_db;
+CREATE DATABASE IF NOT EXISTS car_expense;
+USE car_expense;
 
 CREATE TABLE IF NOT EXISTS rides (
     id INT AUTO_INCREMENT PRIMARY KEY,
