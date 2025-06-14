@@ -15,7 +15,7 @@ const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'user',
   password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'car_expense_db',
+  database: process.env.DB_NAME || 'car_expense',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -69,6 +69,8 @@ const createTables = async () => {
   try {
     // Drop existing tables to start fresh
     await pool.query('DROP TABLE IF EXISTS ride_expense_link');
+    await pool.query('DROP TABLE IF EXISTS expense_balances');
+    await pool.query('DROP TABLE IF EXISTS exported_items');
     await pool.query('DROP TABLE IF EXISTS expenses');
     await pool.query('DROP TABLE IF EXISTS rides');
 
@@ -76,19 +78,21 @@ const createTables = async () => {
     await pool.query(`
       CREATE TABLE rides (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        driver VARCHAR(255) NOT NULL,
+        driver ENUM('Anne', 'Bram') NOT NULL,
         distance FLOAT NOT NULL,
-        date DATE NOT NULL
+        date DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
     await pool.query(`
       CREATE TABLE expenses (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        amount FLOAT NOT NULL,
-        description TEXT NOT NULL,
-        date DATE NOT NULL,
-        payer VARCHAR(255) NOT NULL
+        amount DECIMAL(10,2) NOT NULL,
+        date DATETIME NOT NULL,
+        payer ENUM('Anne', 'Bram') NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -97,7 +101,8 @@ const createTables = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         ride_id INT NOT NULL,
         expense_id INT NOT NULL,
-        percentage FLOAT NOT NULL,
+        percentage DECIMAL(5,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (ride_id) REFERENCES rides(id),
         FOREIGN KEY (expense_id) REFERENCES expenses(id)
       )
@@ -107,10 +112,22 @@ const createTables = async () => {
       CREATE TABLE expense_balances (
         id INT AUTO_INCREMENT PRIMARY KEY,
         expense_id INT NOT NULL,
-        from_user VARCHAR(255) NOT NULL,
-        to_user VARCHAR(255) NOT NULL,
-        amount FLOAT NOT NULL,
-        FOREIGN KEY (expense_id) REFERENCES expenses(id)
+        from_user ENUM('Anne', 'Bram') NOT NULL,
+        to_user ENUM('Anne', 'Bram') NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (expense_id) REFERENCES expenses(id),
+        CHECK (from_user != to_user)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE exported_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        item_type ENUM('ride', 'expense', 'balance') NOT NULL,
+        item_id INT NOT NULL,
+        exported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_item (item_type, item_id)
       )
     `);
 
@@ -228,12 +245,11 @@ app.get('/api/rides/linked', async (req, res) => {
   }
 });
 
-// Get summary with balances
-app.get('/api/summary/balances', async (req, res) => {
+// Get detailed balances
+app.get('/api/expense-balances', async (req, res) => {
   try {
-    // Get detailed balances per expense
-    const [detailedBalances] = await pool.query(`
-      SELECT 
+    const query = `
+      SELECT DISTINCT
         e.id as expense_id,
         e.description,
         e.date,
@@ -243,11 +259,24 @@ app.get('/api/summary/balances', async (req, res) => {
         CAST(eb.amount AS DECIMAL(10,2)) as balance_amount
       FROM expenses e
       JOIN expense_balances eb ON e.id = eb.expense_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM exported_items ei 
+        WHERE ei.item_type = 'expense' AND ei.item_id = e.id
+      )
       ORDER BY e.date DESC, e.id DESC
-    `);
+    `;
+    const [rows] = await pool.query(query);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching expense balances:', error);
+    res.status(500).json({ error: 'Error fetching expense balances' });
+  }
+});
 
-    // Get total balances
-    const [totalBalances] = await pool.query(`
+// Get total balances
+app.get('/api/total-balances', async (req, res) => {
+  try {
+    const query = `
       WITH all_users AS (
         SELECT 'Anne' as user UNION SELECT 'Bram'
       ),
@@ -257,6 +286,12 @@ app.get('/api/summary/balances', async (req, res) => {
           CAST(COALESCE(SUM(eb.amount), 0) AS DECIMAL(10,2)) as balance
         FROM all_users au
         LEFT JOIN expense_balances eb ON au.user = eb.from_user
+        LEFT JOIN ride_expense_link rel ON eb.expense_id = rel.expense_id
+        LEFT JOIN rides r ON rel.ride_id = r.id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM exported_items ei 
+          WHERE ei.item_type = 'ride' AND ei.item_id = r.id
+        )
         GROUP BY au.user
       )
       SELECT 
@@ -273,17 +308,12 @@ app.get('/api/summary/balances', async (req, res) => {
       JOIN user_balances b2 ON b1.user != b2.user
       WHERE b1.user < b2.user
       AND ABS(b1.balance - b2.balance) > 0
-    `);
-
-    console.log('Total balances:', totalBalances);
-
-    res.json({
-      detailedBalances,
-      totalBalances
-    });
+    `;
+    const [rows] = await pool.query(query);
+    res.json(rows);
   } catch (error) {
-    console.error('Error getting balances:', error);
-    res.status(500).json({ error: 'Failed to get balances' });
+    console.error('Error fetching total balances:', error);
+    res.status(500).json({ error: 'Error fetching total balances' });
   }
 });
 

@@ -1,6 +1,8 @@
-CREATE DATABASE IF NOT EXISTS car_expense_db;
-USE car_expense_db;
+-- Create database
+CREATE DATABASE IF NOT EXISTS car_expense;
+USE car_expense;
 
+-- Create tables
 CREATE TABLE IF NOT EXISTS rides (
     id INT AUTO_INCREMENT PRIMARY KEY,
     driver ENUM('Anne', 'Bram') NOT NULL,
@@ -37,7 +39,7 @@ CREATE TABLE IF NOT EXISTS expense_balances (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (expense_id) REFERENCES expenses(id),
     CHECK (from_user != to_user)
-); 
+);
 
 CREATE TABLE IF NOT EXISTS exported_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,4 +47,4 @@ CREATE TABLE IF NOT EXISTS exported_items (
     item_id INT NOT NULL,
     exported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_item (item_type, item_id)
-);
+); 

@@ -15,30 +15,33 @@ import {
 
 function Summary() {
   const [summary, setSummary] = useState([]);
-  const [balances, setBalances] = useState({ detailedBalances: [], totalBalances: [] });
+  const [detailedBalances, setDetailedBalances] = useState([]);
+  const [totalBalances, setTotalBalances] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [summaryResponse, balancesResponse] = await Promise.all([
+        const [summaryResponse, detailedResponse, totalResponse] = await Promise.all([
           fetch('http://localhost:3001/api/summary'),
-          fetch('http://localhost:3001/api/summary/balances')
+          fetch('http://localhost:3001/api/expense-balances'),
+          fetch('http://localhost:3001/api/total-balances')
         ]);
 
-        if (!summaryResponse.ok || !balancesResponse.ok) {
+        if (!summaryResponse.ok || !detailedResponse.ok || !totalResponse.ok) {
           throw new Error('Failed to fetch data');
         }
 
         const summaryData = await summaryResponse.json();
-        const balancesData = await balancesResponse.json();
+        const detailedData = await detailedResponse.json();
+        const totalData = await totalResponse.json();
 
-        console.log('Received balances data:', balancesData);
-        console.log('Detailed balances:', balancesData.detailedBalances);
-        console.log('Total balances:', balancesData.totalBalances);
+        console.log('Received detailed balances data:', detailedData);
+        console.log('Total balances data:', totalData);
         
         setSummary(summaryData);
-        setBalances(balancesData);
+        setDetailedBalances(detailedData);
+        setTotalBalances(totalData);
       } catch (error) {
         setError(error.message);
       }
@@ -51,38 +54,19 @@ function Summary() {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  return (
-    <Box sx={{ mt: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        Summary
-      </Typography>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Driver</TableCell>
-              <TableCell align="right">Total Distance (km)</TableCell>
-              <TableCell align="right">Total Expense (€)</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {summary.map((row) => (
-              <TableRow key={row.driver}>
-                <TableCell>{row.driver}</TableCell>
-                <TableCell align="right">{row.total_distance}</TableCell>
-                <TableCell align="right">
-                  {typeof row.total_expense === 'number' ? row.total_expense.toFixed(2) : '0.00'}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+  if (detailedBalances.length === 0) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">No outstanding balances to display.</Typography>
+      </Box>
+    );
+  }
 
-      <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-        Balances per Expense
-      </Typography>
-      <TableContainer component={Paper}>
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" gutterBottom>Summary</Typography>
+      
+      <TableContainer component={Paper} sx={{ mb: 4 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -90,46 +74,41 @@ function Summary() {
               <TableCell>Description</TableCell>
               <TableCell>From</TableCell>
               <TableCell>To</TableCell>
-              <TableCell align="right">Amount (€)</TableCell>
+              <TableCell align="right">Amount</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {balances.detailedBalances?.map((balance, index) => (
-              <TableRow key={index}>
+            {detailedBalances.map((balance) => (
+              <TableRow key={`${balance.expense_id}-${balance.from_user}-${balance.to_user}`}>
                 <TableCell>{new Date(balance.date).toLocaleDateString()}</TableCell>
                 <TableCell>{balance.description}</TableCell>
                 <TableCell>{balance.from_user}</TableCell>
                 <TableCell>{balance.to_user}</TableCell>
-                <TableCell align="right">
-                  {Number(balance.balance_amount).toFixed(2)}
-                </TableCell>
+                <TableCell align="right">€{balance.balance_amount}</TableCell>
               </TableRow>
             ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Typography variant="h6" gutterBottom>Total Balances</Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={5}>
-                <Divider />
-              </TableCell>
+              <TableCell>From</TableCell>
+              <TableCell>To</TableCell>
+              <TableCell align="right">Amount</TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell colSpan={3}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  Total Balance
-                </Typography>
-              </TableCell>
-              <TableCell colSpan={2}>
-                {balances.totalBalances?.length > 0 ? (
-                  balances.totalBalances.map((balance, index) => (
-                    <Typography key={index} align="right">
-                      {balance.from_user} owes {balance.to_user}: €{Number(balance.amount).toFixed(2)}
-                    </Typography>
-                  ))
-                ) : (
-                  <Typography align="right" color="text.secondary">
-                    No outstanding balances
-                  </Typography>
-                )}
-              </TableCell>
-            </TableRow>
+          </TableHead>
+          <TableBody>
+            {totalBalances.map((balance) => (
+              <TableRow key={`${balance.from_user}-${balance.to_user}`}>
+                <TableCell>{balance.from_user}</TableCell>
+                <TableCell>{balance.to_user}</TableCell>
+                <TableCell align="right">€{balance.amount}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
