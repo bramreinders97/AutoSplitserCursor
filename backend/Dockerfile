@@ -1,17 +1,19 @@
-FROM node:18-alpine
+FROM php:8.2-apache
 
-WORKDIR /app
+# Install MySQL extension and other dependencies
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-COPY package*.json ./
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
 
-RUN npm install
+# Set working directory
+WORKDIR /var/www/html
 
-# Copy .env file first to ensure it's available
-COPY .env* ./
+# Copy Apache configuration
+COPY docker/apache/000-default.conf /etc/apache2/sites-available/000-default.conf
 
-# Then copy the rest of the application
-COPY . .
+# Copy application files
+COPY src/ /var/www/html/
 
-EXPOSE 3001
-
-CMD ["npm", "run", "dev"] 
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html 
