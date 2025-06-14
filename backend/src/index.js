@@ -248,28 +248,34 @@ app.get('/api/summary/balances', async (req, res) => {
 
     // Get total balances
     const [totalBalances] = await pool.query(`
-      WITH user_balances AS (
+      WITH all_users AS (
+        SELECT 'Anne' as user UNION SELECT 'Bram'
+      ),
+      user_balances AS (
         SELECT 
-          from_user as user,
-          CAST(SUM(amount) AS DECIMAL(10,2)) as balance
-        FROM expense_balances
-        GROUP BY from_user
+          au.user,
+          CAST(COALESCE(SUM(eb.amount), 0) AS DECIMAL(10,2)) as balance
+        FROM all_users au
+        LEFT JOIN expense_balances eb ON au.user = eb.from_user
+        GROUP BY au.user
       )
       SELECT 
         CASE 
-          WHEN b1.balance > 0 THEN b1.user
+          WHEN b1.balance > b2.balance THEN b1.user
           ELSE b2.user
         END as from_user,
         CASE 
-          WHEN b1.balance > 0 THEN b2.user
+          WHEN b1.balance > b2.balance THEN b2.user
           ELSE b1.user
         END as to_user,
-        CAST(LEAST(ABS(b1.balance), ABS(b2.balance)) AS DECIMAL(10,2)) as amount
+        CAST(ABS(b1.balance - b2.balance) AS DECIMAL(10,2)) as amount
       FROM user_balances b1
-      CROSS JOIN user_balances b2
+      JOIN user_balances b2 ON b1.user != b2.user
       WHERE b1.user < b2.user
-      AND b1.balance * b2.balance < 0
+      AND ABS(b1.balance - b2.balance) > 0
     `);
+
+    console.log('Total balances:', totalBalances);
 
     res.json({
       detailedBalances,

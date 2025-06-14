@@ -34,6 +34,9 @@ function Summary() {
         const balancesData = await balancesResponse.json();
 
         console.log('Received balances data:', balancesData);
+        console.log('Detailed balances:', balancesData.detailedBalances);
+        console.log('Total balances:', balancesData.totalBalances);
+        
         setSummary(summaryData);
         setBalances(balancesData);
       } catch (error) {
@@ -114,11 +117,17 @@ function Summary() {
                 </Typography>
               </TableCell>
               <TableCell colSpan={2}>
-                {balances.totalBalances?.map((balance, index) => (
-                  <Typography key={index} align="right">
-                    {balance.from_user} owes {balance.to_user}: €{Number(balance.amount).toFixed(2)}
+                {balances.totalBalances?.length > 0 ? (
+                  balances.totalBalances.map((balance, index) => (
+                    <Typography key={index} align="right">
+                      {balance.from_user} owes {balance.to_user}: €{Number(balance.amount).toFixed(2)}
+                    </Typography>
+                  ))
+                ) : (
+                  <Typography align="right" color="text.secondary">
+                    No outstanding balances
                   </Typography>
-                ))}
+                )}
               </TableCell>
             </TableRow>
           </TableBody>
