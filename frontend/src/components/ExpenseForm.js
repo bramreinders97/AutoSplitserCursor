@@ -13,6 +13,8 @@ import {
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 function ExpenseForm({ rides, onSuccess }) {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date());
@@ -28,11 +30,11 @@ function ExpenseForm({ rides, onSuccess }) {
     const fetchLinkedRides = async () => {
       try {
         // Get all rides
-        const response = await fetch('http://localhost:3001/api/rides');
+        const response = await fetch(`${API_URL}/api/rides`);
         const allRides = await response.json();
         
         // Get all rides that are linked to expenses
-        const linkedRidesResponse = await fetch('http://localhost:3001/api/rides/linked');
+        const linkedRidesResponse = await fetch(`${API_URL}/api/rides/linked`);
         const linkedRides = await linkedRidesResponse.json();
         
         // Create a set of ride IDs that are linked to expenses
@@ -68,7 +70,7 @@ function ExpenseForm({ rides, onSuccess }) {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/expenses', {
+      const response = await fetch(`${API_URL}/api/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,6 +119,7 @@ function ExpenseForm({ rides, onSuccess }) {
         fullWidth
         label="Amount (€)"
         type="number"
+        inputProps={{ step: "0.01" }}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         required

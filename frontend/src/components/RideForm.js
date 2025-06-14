@@ -74,6 +74,7 @@ function RideForm({ onSuccess }) {
         fullWidth
         label="Distance (km)"
         type="number"
+        inputProps={{ step: "0.1" }}
         value={distance}
         onChange={(e) => setDistance(e.target.value)}
         required
