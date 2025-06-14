@@ -12,6 +12,12 @@ import {
   Alert,
 } from '@mui/material';
 
+// Generate a pastel color based on an ID
+const generateColor = (id) => {
+  const hue = (id * 137.5) % 360; // Golden angle approximation
+  return `hsl(${hue}, 70%, 90%)`;
+};
+
 function Summary() {
   const [summary, setSummary] = useState([]);
   const [detailedBalances, setDetailedBalances] = useState([]);
@@ -80,14 +86,21 @@ function Summary() {
                   <TableCell>Date</TableCell>
                   <TableCell>Driver</TableCell>
                   <TableCell align="right">Distance (km)</TableCell>
+                  <TableCell>Expense</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {unexportedRides.map((ride) => (
-                  <TableRow key={ride.id}>
+                  <TableRow 
+                    key={ride.id}
+                    sx={{ 
+                      backgroundColor: ride.expense_id ? generateColor(ride.expense_id) : 'inherit'
+                    }}
+                  >
                     <TableCell>{new Date(ride.date).toLocaleDateString()}</TableCell>
                     <TableCell>{ride.driver}</TableCell>
                     <TableCell align="right">{ride.distance}</TableCell>
+                    <TableCell>{ride.expense_description || 'Not linked'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -106,13 +119,18 @@ function Summary() {
                   <TableCell>Expense</TableCell>
                   <TableCell>From</TableCell>
                   <TableCell>To</TableCell>
-                  <TableCell>Amount</TableCell>
+                  <TableCell>Amount Owed</TableCell>
                   <TableCell>Total Paid</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {detailedBalances.map((balance, index) => (
-                  <TableRow key={index}>
+                  <TableRow 
+                    key={index}
+                    sx={{ 
+                      backgroundColor: generateColor(balance.expense_id)
+                    }}
+                  >
                     <TableCell>{balance.expense_description}</TableCell>
                     <TableCell>{balance.from_user}</TableCell>
                     <TableCell>{balance.to_user}</TableCell>

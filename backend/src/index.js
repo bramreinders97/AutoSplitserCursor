@@ -346,12 +346,21 @@ app.get('/api/rides/unexported', async (req, res) => {
   try {
     console.log('Fetching unexported rides...');
     const [rides] = await pool.query(`
-      SELECT r.* 
+      SELECT 
+        r.id,
+        r.driver,
+        r.distance,
+        r.date,
+        r.created_at,
+        e.id as expense_id,
+        e.description as expense_description
       FROM rides r
-      LEFT JOIN exported_items ei ON r.id = ei.item_id AND ei.item_type = 'ride'
-      WHERE ei.id IS NULL
+      LEFT JOIN ride_expense_link rel ON r.id = rel.ride_id
+      LEFT JOIN expenses e ON rel.expense_id = e.id
+      WHERE r.id NOT IN (SELECT ride_id FROM exported_items)
       ORDER BY r.date DESC
     `);
+
     console.log('Found unexported rides:', rides);
     res.json(rides);
   } catch (error) {
